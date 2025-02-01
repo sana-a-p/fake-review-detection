@@ -11,10 +11,15 @@ import torch.optim as optim
 from flask import Flask, render_template, request, jsonify
 from torch.utils.data import DataLoader, TensorDataset
 import os
+import sys
+
 
 # Initialize Flask app
 app = Flask(__name__)
 project_home = '/home/sana-a-p/fake-review-detection'
+project_home = '/home/yourusername/yourproject'
+if project_home not in sys.path:
+    sys.path.insert(0, project_home)
 # Download necessary NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
