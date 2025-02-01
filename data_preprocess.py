@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.optim as optim
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from torch.utils.data import DataLoader, TensorDataset
-import pickle
 import os
 
 # Initialize Flask app
