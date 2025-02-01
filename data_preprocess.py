@@ -8,13 +8,13 @@ from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, jsonify
 from torch.utils.data import DataLoader, TensorDataset
 import os
 
 # Initialize Flask app
 app = Flask(__name__)
-
+project_home = '/home/sana-a-p/fake-review-detection'
 # Download necessary NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -36,20 +36,22 @@ W2V_PATH = "w2v_model.bin"
 if os.path.exists(W2V_PATH):
     w2v_model = Word2Vec.load(W2V_PATH)
 else:
-    w2v_model = Word2Vec(sentences=data['cleaned_reviews'], vector_size=300, window=5, min_count=2, workers=4)
+    w2v_model = Word2Vec(sentences=data['cleaned_reviews'].tolist(), vector_size=300, window=5, min_count=1, workers=4)
     w2v_model.save(W2V_PATH)
 
 # Convert reviews into Word2Vec embeddings
 def review_to_vector(review, model, vector_size=300):
     vectors = [model.wv[word] for word in review if word in model.wv]
-    return np.mean(vectors, axis=0) if vectors else np.zeros(vector_size)
+    if not vectors:
+        return np.zeros(vector_size)
+    return np.mean(vectors, axis=0)
 
 X = np.array([review_to_vector(review, w2v_model) for review in data['cleaned_reviews']])
 y = data['validity'].values  # Labels column
 
 # Convert to PyTorch tensors
-X_tensor = torch.tensor(X, dtype=torch.float32)
-y_tensor = torch.tensor(y, dtype=torch.float32).unsqueeze(1)  # Reshape for BCELoss
+X_tensor = torch.from_numpy(X).float().view(X.shape[0], 1, X.shape[1])  # Reshape for LSTM
+y_tensor = torch.from_numpy(y).float().unsqueeze(1)
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
@@ -68,7 +70,7 @@ class MIANA(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        lstm_out, _ = self.bi_lstm(x.unsqueeze(1))  # Add sequence dim
+        lstm_out, _ = self.bi_lstm(x)
         attention_weights = torch.softmax(self.attention(lstm_out), dim=1)
         weighted_sum = torch.sum(attention_weights * lstm_out, dim=1)
         output = self.fc(weighted_sum)
@@ -85,7 +87,6 @@ else:
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.BCELoss()
 
-    # Training loop
     for epoch in range(5):  # Train for 5 epochs
         model.train()
         total_loss = 0
@@ -96,46 +97,43 @@ else:
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
-
-    # Save model
+        
+        # Validation after each epoch
+        model.eval()
+        val_loss, correct, total = 0, 0, 0
+        with torch.no_grad():
+            for X_batch, y_batch in test_loader:
+                predictions = model(X_batch).squeeze(1)
+                val_loss += criterion(predictions, y_batch.squeeze(1)).item()
+                correct += ((predictions > 0.5).float() == y_batch.squeeze(1)).sum().item()
+                total += y_batch.size(0)
+        
+        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}, Validation Loss: {val_loss:.4f}, Accuracy: {correct/total:.2%}")
+    
     torch.save(model.state_dict(), MODEL_PATH)
-
-# Evaluate the model
-model.eval()
-correct, total = 0, 0
-with torch.no_grad():
-    for X_batch, y_batch in test_loader:
-        predictions = model(X_batch).squeeze(1)
-        predicted_labels = (predictions > 0.5).float()
-        correct += (predicted_labels == y_batch.squeeze(1)).sum().item()
-        total += y_batch.size(0)
-
-print(f'Accuracy on test set: {correct / total * 100:.2f}%')
 
 # Flask API for predictions
 @app.route('/')
 def home():
     return render_template('home.html')
+
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
-        review_text = data.get('review', '')
-
-        if not review_text.strip():
-            return jsonify({'error': 'Review text is empty'}), 400
-
-        # Preprocess & vectorize
-        tokens = preprocess_text(review_text)
-        vector = review_to_vector(tokens, w2v_model)
-        tensor_input = torch.tensor(vector, dtype=torch.float32).unsqueeze(0)
-
-        # Predict
+        reviews = data.get('reviews', [])
+        
+        if not reviews:
+            return jsonify({'error': 'No reviews provided'}), 400
+        
+        processed_reviews = [preprocess_text(review) for review in reviews]
+        vectors = np.array([review_to_vector(tokens, w2v_model) for tokens in processed_reviews])
+        tensor_input = torch.tensor(vectors, dtype=torch.float32)
+        
         with torch.no_grad():
-            probability = model(tensor_input).item()
-
-        return jsonify({'fake_review_probability': probability})
+            probabilities = model(tensor_input).squeeze(1).tolist()
+        
+        return jsonify({'fake_review_probabilities': probabilities})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
