@@ -7,6 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
+
             background-color: #f4f4f9;
             margin: 0;
             padding: 0;
@@ -96,11 +97,25 @@
         })
         .then(response => response.json())
         .then(data => {
+            // Once the response is received, remove the "Analyzing..." text
+            document.getElementById("result").innerText = ""; // Clear "Analyzing..."
+
             if (data.error) {
-                document.getElementById("result").innerText = "";
                 document.getElementById("error").innerText = data.error;
             } else {
-                document.getElementById("result").innerText = `Fake Review Probability: ${(data.fake_review_probability * 100).toFixed(2)}%`;
+                // Get the fake review probability
+                var probability = data.fake_review_probability;
+
+                // Display the probability
+                //document.getElementById("result").innerText = `Fake Review Probability: ${(probability * 100).toFixed(2)}%`;
+
+                // Show whether the review is fake or genuine based on the threshold
+                if (probability >= 0.2) {
+                    document.getElementById("result").innerText += "\nReview is Fake!";
+                } else {
+                    document.getElementById("result").innerText += "\nReview is Genuine.";
+                }
+
                 document.getElementById("error").innerText = "";
             }
         })
@@ -110,6 +125,7 @@
         });
     }
 </script>
+
 
 </body>
 </html>

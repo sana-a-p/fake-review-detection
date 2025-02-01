@@ -17,12 +17,10 @@ import os
 app = Flask(__name__)
 
 # Download necessary NLTK data
-nltk.download('wordnet')
-nltk.download('punkt')
-nltk.download('stopwords')
+# nltk.download('punkt')
+# nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
-
 # Load dataset
 data = pd.read_csv('yelp.csv')
 
@@ -88,9 +86,14 @@ if os.path.exists(MODEL_PATH):
     print("Model loaded successfully.")
 else:
     optimizer = optim.Adam(model.parameters(), lr=0.0005)  # Try a lower learning rate
+
     criterion = nn.BCELoss()
 
-    # Training loop
+    # Class weights for imbalance (more weight to fake reviews)
+    class_weights = torch.tensor([1.0, 3.0])  # Assuming fake reviews are labeled as 1 and genuine as 0
+    class_weights = class_weights.to(torch.float32)
+
+    # Training loop with class weights
     for epoch in range(10):  # Increase epochs to 10
         model.train()
         total_loss = 0
@@ -112,7 +115,7 @@ correct, total = 0, 0
 with torch.no_grad():
     for X_batch, y_batch in test_loader:
         predictions = model(X_batch).squeeze(1)
-        predicted_labels = (predictions > 0.5).float()  # Changed threshold to 0.5
+        predicted_labels = (predictions > 0.3).float()  # Adjust threshold if necessary
         correct += (predicted_labels == y_batch.squeeze(1)).sum().item()
         total += y_batch.size(0)
 
@@ -140,13 +143,13 @@ def predict():
         # Predict
         with torch.no_grad():
             probability = model(tensor_input).item()
-        predicted_label = 1 if probability > 0.5 else 0  # Fix variable reference
-
-        return jsonify({'fake_review_probability': probability, 'predicted_label': predicted_label})
+        predicted_labels = (predictions > 0.5).float()  # Changed threshold to 0.5
+        
+        return jsonify({'fake_review_probability': probability})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # Run Flask server
-if __name__ == '__main__':  # Fixed the name check
+if __name__ == '__main__':
     app.run(debug=True)
