@@ -17,8 +17,8 @@ import os
 app = Flask(__name__)
 
 # Download necessary NLTK data
-# nltk.download('punkt')
-# nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 # Load dataset
