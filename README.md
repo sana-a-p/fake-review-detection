@@ -93,7 +93,7 @@ For Hardware:
 
 ### Project Demo
 # Video
-[Add your demo video link here]
+fake review detect demo
 *Explain what the video demonstrates*
 
 # Additional Demos
