@@ -11,7 +11,8 @@
 
 
 ### Hosted Project Link
-[mention your project hosted project link here]
+[[mention your project hosted project link here]](https://fake-review-detection.onrender.com)
+The created project is ML based therefore deploying is not feasible
 
 ### Project Description
 This project is a sentiment analysis tool designed to detect fake reviews in datasets like Yelp reviews. 
@@ -93,8 +94,8 @@ For Hardware:
 
 ### Project Demo
 # Video
-fake review detect demo
-*Explain what the video demonstrates*
+[fake review detect demo](https://github.com/sana-a-p/fake-review-detection/blob/main/fake%20review%20detect%20demo)
+page inputs review as as text and using MIANA model trained displays whether review is fake or genuine.
 
 # Additional Demos
 [Add any extra demo materials/links]
