@@ -56,13 +56,13 @@ python data_preprocess.py
 For Software:
 
 # Screenshots (Add at least 3)
-![Screenshot1]screenshot1
+![Screenshot1][screenshot1](https://github.com/sana-a-p/fake-review-detection/blob/main/screenshot1)
 initial page 
 
-![Screenshot2]screenshot2
+![Screenshot2][screenshot2](https://github.com/sana-a-p/fake-review-detection/blob/main/screenshot2)
 page showing genuine review
 
-![Screenshot3]screenshot3.png
+![Screenshot3][screenshot3](https://github.com/sana-a-p/fake-review-detection/blob/main/screenshot3)
 page showing fake review
 
 # Diagrams
