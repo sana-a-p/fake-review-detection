@@ -59,7 +59,7 @@ For Software:
 ![Screenshot1]screenshot1
 initial page 
 
-![Screenshot2](Add screenshot 2 here with proper name)
+![Screenshot2]screenshot2
 page showing genuine review
 
 ![Screenshot3](Add screenshot 3 here with proper name)
