@@ -1,4 +1,4 @@
-#Fakr Review Detector 🎯
+#Fakr Review Detection 🎯
 
 
 ## Basic Details
@@ -50,23 +50,20 @@ nltk.download('wordnet')
 
 
 # Run
-Run the Python script to train and evaluate the model:
-python your_script_name.py
-Start the Flask application by running:
-python your_script_name.py
+python data_preprocess.py
 
 ### Project Documentation
 For Software:
 
 # Screenshots (Add at least 3)
 ![Screenshot1](Add screenshot 1 here with proper name)
-*Add caption explaining what this shows*
+initial page 
 
 ![Screenshot2](Add screenshot 2 here with proper name)
-*Add caption explaining what this shows*
+page showing genuine review
 
 ![Screenshot3](Add screenshot 3 here with proper name)
-*Add caption explaining what this shows*
+page showing fake review
 
 # Diagrams
 ![Workflow](Add your workflow/architecture diagram here)
