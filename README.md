@@ -62,7 +62,7 @@ initial page
 ![Screenshot2]screenshot2
 page showing genuine review
 
-![Screenshot3](Add screenshot 3 here with proper name)
+![Screenshot3]screenshot3.png
 page showing fake review
 
 # Diagrams
