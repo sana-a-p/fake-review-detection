@@ -6,6 +6,7 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,28 +18,38 @@ import os
 app = Flask(__name__)
 
 # Download necessary NLTK data
-nltk.download('punkt_tab')
+nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('wordnet')
+
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
+
 # Load dataset
-data = pd.read_csv('yelp.csv')
+data = pd.read_csv('Home_and_Kitchen.csv')
+
+# Ensure binary labels
+data['validity'] = data['validity'].astype(int)
 
 # Preprocess text function
 def preprocess_text(text):
-    tokens = word_tokenize(str(text).lower())  # Convert to lowercase & tokenize
-    tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalpha() and word not in stop_words]  # Remove stopwords & non-alpha, lemmatize
+    tokens = word_tokenize(str(text).lower())  
+    tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalpha() and word not in stop_words]  
     return tokens
 
 data['cleaned_reviews'] = data['text'].apply(preprocess_text)
 
-# Train or load Word2Vec model
+# Stratified train-test split to handle imbalance
+X_train_texts, X_test_texts, y_train, y_test = train_test_split(
+    data['cleaned_reviews'], data['validity'], test_size=0.2, stratify=data['validity'], random_state=42
+)
+
+# Train Word2Vec
 W2V_PATH = "w2v_model.bin"
 if os.path.exists(W2V_PATH):
     w2v_model = Word2Vec.load(W2V_PATH)
 else:
-    w2v_model = Word2Vec(sentences=data['cleaned_reviews'], vector_size=300, window=5, min_count=2, workers=4)
+    w2v_model = Word2Vec(sentences=X_train_texts, vector_size=300, window=5, min_count=2, workers=4, sg=1, epochs=10)
     w2v_model.save(W2V_PATH)
 
 # Convert reviews into Word2Vec embeddings
@@ -46,21 +57,20 @@ def review_to_vector(review, model, vector_size=300):
     vectors = [model.wv[word] for word in review if word in model.wv]
     return np.mean(vectors, axis=0) if vectors else np.zeros(vector_size)
 
-X = np.array([review_to_vector(review, w2v_model) for review in data['cleaned_reviews']])
-y = data['validity'].values  # Labels column
+X_train = np.array([review_to_vector(review, w2v_model) for review in X_train_texts])
+X_test = np.array([review_to_vector(review, w2v_model) for review in X_test_texts])
 
 # Convert to PyTorch tensors
-X_tensor = torch.tensor(X, dtype=torch.float32)
-y_tensor = torch.tensor(y, dtype=torch.float32).unsqueeze(1)  # Reshape for BCELoss
-
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X_tensor, y_tensor, test_size=0.2, random_state=42)
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train.values, dtype=torch.float32).unsqueeze(1)
+y_test_tensor = torch.tensor(y_test.values, dtype=torch.float32).unsqueeze(1)
 
 # Create DataLoader
-train_loader = DataLoader(TensorDataset(X_train, y_train), batch_size=32, shuffle=True)
-test_loader = DataLoader(TensorDataset(X_test, y_test), batch_size=32)
+train_loader = DataLoader(TensorDataset(X_train_tensor, y_train_tensor), batch_size=32, shuffle=True)
+test_loader = DataLoader(TensorDataset(X_test_tensor, y_test_tensor), batch_size=32)
 
-# Define MIANA model with dropout for regularization
+# Define MIANA model
 class MIANA(nn.Module):
     def __init__(self, input_size=300, hidden_size=150, dropout=0.5):
         super(MIANA, self).__init__()
@@ -68,17 +78,17 @@ class MIANA(nn.Module):
         self.attention = nn.Linear(hidden_size * 2, 1)
         self.fc = nn.Linear(hidden_size * 2, 1)
         self.sigmoid = nn.Sigmoid()
-        self.dropout = nn.Dropout(dropout)  # Dropout for regularization
+        self.dropout = nn.Dropout(dropout)  
 
     def forward(self, x):
-        lstm_out, _ = self.bi_lstm(x.unsqueeze(1))  # Add sequence dim
-        lstm_out = self.dropout(lstm_out)  # Apply dropout
+        lstm_out, _ = self.bi_lstm(x.unsqueeze(1))  
+        lstm_out = self.dropout(lstm_out)  
         attention_weights = torch.softmax(self.attention(lstm_out), dim=1)
         weighted_sum = torch.sum(attention_weights * lstm_out, dim=1)
         output = self.fc(weighted_sum)
         return self.sigmoid(output)
 
-# Train or load model
+# Load or train the model
 MODEL_PATH = "miana_model.pth"
 model = MIANA(input_size=300, hidden_size=150)
 
@@ -86,16 +96,17 @@ if os.path.exists(MODEL_PATH):
     model.load_state_dict(torch.load(MODEL_PATH))
     print("Model loaded successfully.")
 else:
-    optimizer = optim.Adam(model.parameters(), lr=0.0005)  # Try a lower learning rate
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
+    # Compute class weights dynamically
+    class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
+    class_weights = torch.tensor(class_weights, dtype=torch.float32)
+    
+    # Corrected BCELoss application
     criterion = nn.BCELoss()
 
-    # Class weights for imbalance (more weight to fake reviews)
-    class_weights = torch.tensor([1.0, 3.0])  # Assuming fake reviews are labeled as 1 and genuine as 0
-    class_weights = class_weights.to(torch.float32)
-
-    # Training loop with class weights
-    for epoch in range(10):  # Increase epochs to 10
+    # Training loop
+    for epoch in range(20):
         model.train()
         total_loss = 0
         for X_batch, y_batch in train_loader:
@@ -116,7 +127,7 @@ correct, total = 0, 0
 with torch.no_grad():
     for X_batch, y_batch in test_loader:
         predictions = model(X_batch).squeeze(1)
-        predicted_labels = (predictions > 0.3).float()  # Adjust threshold if necessary
+        predicted_labels = (predictions > 0.5).float()  
         correct += (predicted_labels == y_batch.squeeze(1)).sum().item()
         total += y_batch.size(0)
 
@@ -144,9 +155,12 @@ def predict():
         # Predict
         with torch.no_grad():
             probability = model(tensor_input).item()
-        predicted_labels = (predictions > 0.5).float()  # Changed threshold to 0.5
-        
-        return jsonify({'fake_review_probability': probability})
+        predicted_label = 1 if probability > 0.5 else 0  
+
+        return jsonify({
+            'fake_review_probability': probability,
+            'is_fake': bool(predicted_label)
+        })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -154,3 +168,4 @@ def predict():
 # Run Flask server
 if __name__ == '__main__':
     app.run(debug=True)
+
