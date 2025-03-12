@@ -110,7 +110,7 @@
                 //document.getElementById("result").innerText = `Fake Review Probability: ${(probability * 100).toFixed(2)}%`;
 
                 // Show whether the review is fake or genuine based on the threshold
-                if (probability >= 0.2) {
+                if (probability >= 0.4) {
                     document.getElementById("result").innerText += "\nReview is Fake!";
                 } else {
                     document.getElementById("result").innerText += "\nReview is Genuine.";
