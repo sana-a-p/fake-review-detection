@@ -1,4 +1,4 @@
-#Fakr Review Detection 🎯
+#Fake Review Detection 🎯
 
 
 ## Basic Details
