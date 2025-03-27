@@ -7,7 +7,6 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-
             background-color: #f4f4f9;
             margin: 0;
             padding: 0;
@@ -25,6 +24,7 @@
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
         }
         .input-area {
             margin-bottom: 1.5rem;
@@ -55,7 +55,80 @@
         .error {
             color: red;
         }
+        .meter-container {
+            width: 100%;
+            background: #ddd;
+            height: 25px;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 1rem;
+            position: relative;
+        }
+        .meter {
+            height: 100%;
+            width: 0%;
+            background-color: green;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+        }
+        .percentage {
+            position: absolute;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: bold;
+            color: black;
+        }
     </style>
+    <script>
+        function predictReview() {
+            var reviewText = document.getElementById("review").value.trim();
+            
+            if (!reviewText) {
+                document.getElementById("error").innerText = "Please enter a review before submitting!";
+                document.getElementById("result").innerText = "";
+                return;
+            }
+
+            document.getElementById("error").innerText = "";
+            document.getElementById("result").innerText = "Analyzing...";
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ review: reviewText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = "";
+
+                if (data.error) {
+                    document.getElementById("error").innerText = data.error;
+                } else {
+                    var probability = data.fake_review_probability;
+                    var percentage = (probability * 100).toFixed(2);
+                    document.getElementById("result").innerText = probability >= 0.7 ? "Review is Fake!" : (probability >= 0.4 ? "Review is Uncertain." : "Review is Genuine.");
+                    document.getElementById("error").innerText = "";
+
+                    var meter = document.querySelector(".meter");
+                    var percentageText = document.querySelector(".percentage");
+                    
+                    meter.style.width = percentage + "%";
+                    if (probability < 0.4) {
+                        meter.style.backgroundColor = "green";
+                    } else if (probability < 0.7) {
+                        meter.style.backgroundColor = "yellow";
+                    } else {
+                        meter.style.backgroundColor = "red";
+                    }
+                    percentageText.innerText = percentage + "%";
+                }
+            })
+            .catch(error => {
+                document.getElementById("result").innerText = "";
+                document.getElementById("error").innerText = "An error occurred: " + error;
+            });
+        }
+    </script>
 </head>
 <body>
 
@@ -72,60 +145,12 @@
 
     <div id="result" class="result"></div>
     <div id="error" class="error"></div>
+    
+    <div class="meter-container">
+        <div class="meter"></div>
+        <div class="percentage">0%</div>
+    </div>
 </div>
-
-<script>
-    function predictReview() {
-        var reviewText = document.getElementById("review").value.trim();
-        
-        if (!reviewText) {
-            document.getElementById("error").innerText = "Please enter a review before submitting!";
-            document.getElementById("result").innerText = "";
-            return;
-        }
-
-        document.getElementById("error").innerText = "";
-        document.getElementById("result").innerText = "Analyzing...";
-
-        // Send POST request to the Flask API for prediction
-        fetch('/predict', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ review: reviewText })
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Once the response is received, remove the "Analyzing..." text
-            document.getElementById("result").innerText = ""; // Clear "Analyzing..."
-
-            if (data.error) {
-                document.getElementById("error").innerText = data.error;
-            } else {
-                // Get the fake review probability
-                var probability = data.fake_review_probability;
-
-                // Display the probability
-                //document.getElementById("result").innerText = `Fake Review Probability: ${(probability * 100).toFixed(2)}%`;
-
-                // Show whether the review is fake or genuine based on the threshold
-                if (probability >= 0.4) {
-                    document.getElementById("result").innerText += "\nReview is Fake!";
-                } else {
-                    document.getElementById("result").innerText += "\nReview is Genuine.";
-                }
-
-                document.getElementById("error").innerText = "";
-            }
-        })
-        .catch(error => {
-            document.getElementById("result").innerText = "";
-            document.getElementById("error").innerText = "An error occurred: " + error;
-        });
-    }
-</script>
-
 
 </body>
 </html>
