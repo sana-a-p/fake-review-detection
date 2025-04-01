@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-container {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            width: 350px;
+        }
+
+        .logo {
+            width: 60px;
+            margin-bottom: 15px;
+        }
+
+        .login-container h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+        }
+
+        .input-group input::placeholder {
+            color: #bbb;
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 12px;
+            background: #FFD700; /* Gold */
+            border: none;
+            border-radius: 5px;
+            color: black;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background: #e6c200; /* Golden Yellow */
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+    <script>
+        function validateLogin(event) {
+            event.preventDefault(); // Prevent form submission
+
+            let adminId = document.getElementById("admin_id").value;
+            let password = document.getElementById("password").value;
+            let errorMessage = document.getElementById("error-message");
+
+            // Static Admin Credentials
+            if (adminId === "admin" && password === "password123") {
+                window.location.href = "/admin"; // Redirect to Admin Page
+            } else {
+                errorMessage.style.display = "block"; // Show error message
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div class="login-container">
+        <img src="logo.png" alt="Logo" class="logo">
+        <h2>Admin Log In</h2>
+
+        <form onsubmit="validateLogin(event)">
+            <div class="input-group">
+                <input type="text" id="admin_id" placeholder="Admin ID" required>
+            </div>
+
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Password" required>
+            </div>
+
+            <button type="submit" class="login-button">Log In</button>
+            <p id="error-message" class="error-message">Invalid Admin ID or Password</p>
+        </form>
+
+    </div>
+
+</body>
+</html>
