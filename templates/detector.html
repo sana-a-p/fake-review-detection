@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Review Detector</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #111;
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #222;
+            padding: 20px;
+            text-align: center;
+            width: 100%;
+            box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+        }
+
+        .container {
+            width: 50%;
+            margin-top: 30px;
+            padding: 1.5rem;
+            background-color: #222;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+            text-align: center;
+        }
+
+        .category-select, .input-area {
+            width: 100%;
+            margin-bottom: 1.2rem;
+            text-align: left;
+        }
+
+        label {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #FFD700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        select, textarea {
+            width: 100%;  /* Ensures both elements take full width */
+            padding: 10px;
+            border: 2px solid #FFD700;
+            border-radius: 5px;
+            font-size: 1rem;
+            background-color: #333;
+            color: white;
+            display: block;
+            box-sizing: border-box;  /* Ensures padding doesn't affect width */
+        }
+
+
+        textarea {
+            height: 80px;
+            resize: none;
+        }
+
+        .button {
+            padding: 10px 18px;
+            font-size: 1rem;
+            background-color: #FFD700;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+
+        .button:hover {
+            background-color: #E6C200;
+        }
+
+        .result {
+            margin-top: 15px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .error {
+            color: red;
+            font-size: 1.1rem;
+            margin-top: 8px;
+        }
+
+        .meter-container {
+            width: 100%;
+            background: #444;
+            height: 22px;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 15px;
+            position: relative;
+        }
+
+        .meter {
+            height: 100%;
+            width: 0%;
+            background-color: green;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+        }
+
+        .percentage {
+            position: absolute;
+            width: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            font-weight: bold;
+            color: black;
+            text-align: center;
+        }
+    </style>
+    <script>
+        function predictReview() {
+            var category = document.getElementById("category").value;
+            var reviewText = document.getElementById("review").value.trim();
+
+            if (category === "Select Category") {
+                document.getElementById("error").innerText = "Please select a category.";
+                document.getElementById("result").innerText = "";
+                return;
+            }
+
+            if (!reviewText) {
+                document.getElementById("error").innerText = "Please enter a review before submitting!";
+                document.getElementById("result").innerText = "";
+                return;
+            }
+
+            document.getElementById("error").innerText = "";
+            document.getElementById("result").innerText = "Analyzing...";
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ category: category, review: reviewText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("result").innerText = "";
+
+                if (data.error) {
+                    document.getElementById("error").innerText = data.error;
+                } else {
+                    var probability = data.fake_review_probability;
+                    var percentage = (probability * 100).toFixed(2);
+                    document.getElementById("result").innerText = probability >= 0.7 ? "Review is Fake!" : (probability >= 0.4 ? "Review is Uncertain." : "Review is Genuine.");
+                    document.getElementById("error").innerText = "";
+
+                    var meter = document.querySelector(".meter");
+                    var percentageText = document.querySelector(".percentage");
+
+                    meter.style.width = percentage + "%";
+                    if (probability < 0.4) {
+                        meter.style.backgroundColor = "green";
+                    } else if (probability < 0.7) {
+                        meter.style.backgroundColor = "yellow";
+                    } else {
+                        meter.style.backgroundColor = "red";
+                    }
+                    percentageText.innerText = percentage + "%";
+                }
+            })
+            .catch(error => {
+                document.getElementById("result").innerText = "";
+                document.getElementById("error").innerText = "An error occurred: " + error;
+            });
+        }
+    </script>
+</head>
+<body>
+
+<header>
+    <h1>VeriView</h1>
+    <p>Check whether a review is likely fake or genuine!</p>
+</header>
+
+<div class="container">
+    <div class="category-select">
+        <label for="category">Select Category:</label>
+        <select id="category">
+            <option>Select Category</option>
+            <option value="Books">Books</option>
+            <option value="Clothing, Shoes and Jewellery">Clothing, Shoes and Jewellery</option>
+            <option value="Electronics">Electronics</option>
+            <option value="Home and Kitchen">Home and Kitchen</option>
+            <option value="Kindle">Kindle</option>
+            <option value="Movies and TV">Movies and TV</option>
+            <option value="Pet Supplies">Pet Supplies</option>
+            <option value="Sports and Outdoors">Sports and Outdoors</option>
+            <option value="Tools and Home Improvement">Tools and Home Improvement</option>
+            <option value="Toys and Games">Toys and Games</option>
+        </select>
+    </div>
+
+    <div class="input-area">
+        <label for="review">Enter Review:</label>
+        <textarea id="review" placeholder="Write your review here..."></textarea>
+    </div>
+
+    <button class="button" onclick="predictReview()">Submit Review</button>
+
+    <div id="result" class="result"></div>
+    <div id="error" class="error"></div>
+    
+    <div class="meter-container">
+        <div class="meter"></div>
+        <div class="percentage">0%</div>
+    </div>
+</div>
+
+</body>
+</html>
