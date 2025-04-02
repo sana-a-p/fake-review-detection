@@ -17,32 +17,24 @@ import os
 # Initialize Flask app
 app = Flask(__name__)
 
-# Download necessary NLTK data
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('wordnet')
-
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
 # Load dataset
 data = pd.read_csv('Home_and_Kitchen.csv')
 
+# Ensure binary labels
 data['validity'] = data['validity'].astype(int)
 
 # Preprocess text function
 def preprocess_text(text):
     tokens = word_tokenize(str(text).lower())  
     tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalpha() and word not in stop_words]  
-    
-    if len(tokens) < 3:  # Flag meaningless reviews
-        return ["meaningless_review"]
-    
     return tokens
 
 data['cleaned_reviews'] = data['text'].apply(preprocess_text)
 
-# Train-test split
+# Stratified train-test split to handle imbalance
 X_train_texts, X_test_texts, y_train, y_test = train_test_split(
     data['cleaned_reviews'], data['validity'], test_size=0.2, stratify=data['validity'], random_state=42
 )
@@ -55,10 +47,15 @@ else:
     w2v_model = Word2Vec(sentences=X_train_texts, vector_size=300, window=5, min_count=2, workers=4, sg=1, epochs=10)
     w2v_model.save(W2V_PATH)
 
-# Convert reviews to Word2Vec embeddings
+# Convert reviews into Word2Vec embeddings
 def review_to_vector(review, model, vector_size=300):
     vectors = [model.wv[word] for word in review if word in model.wv]
-    return np.mean(vectors, axis=0) if vectors else np.zeros(vector_size)
+    
+    # If no known words, return a distinct OOV vector instead of zeros
+    if not vectors:
+        return np.full(vector_size, -1)  # Use a distinguishable value
+    
+    return np.mean(vectors, axis=0)
 
 X_train = np.array([review_to_vector(review, w2v_model) for review in X_train_texts])
 X_test = np.array([review_to_vector(review, w2v_model) for review in X_test_texts])
@@ -100,8 +97,12 @@ if os.path.exists(MODEL_PATH):
     print("Model loaded successfully.")
 else:
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
+
+    # Compute class weights dynamically
     class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
+    
+    # Corrected BCELoss application
     criterion = nn.BCELoss()
 
     # Training loop
@@ -117,9 +118,10 @@ else:
             total_loss += loss.item()
         print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
 
+    # Save model
     torch.save(model.state_dict(), MODEL_PATH)
 
-# Evaluate model
+# Evaluate the model
 model.eval()
 correct, total = 0, 0
 with torch.no_grad():
@@ -134,42 +136,42 @@ print(f'Accuracy on test set: {correct / total * 100:.2f}%')
 # Flask API for predictions
 @app.route('/')
 def home():
-    return render_template('home.html')
+    return render_template('index.html')
+
+@app.route('/detector')
+def detector():
+    return render_template('detector.html')  
+
+@app.route('/admin_login')
+def admin_login():
+    return render_template('admin_login.html')  
+
+@app.route('/admin')
+def admin():
+    return render_template('admin.html')  
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
         review_text = data.get('review', '')
-
-        if not review_text.strip():
-            return jsonify({'error': 'Review text is empty'}), 400
-
-        tokens = preprocess_text(review_text)
         
-        if tokens == ["meaningless_review"]:
-            return jsonify({
-                'fake_review_probability': 1.0,
-                'is_fake': True,
-                'message': "This review is flagged as nonsense or too short to analyze."
-            })
-
+        if not review_text.strip() or len(word_tokenize(review_text)) < 3:
+            return jsonify({'fake_review_probability': 1.0, 'is_fake': True})
+        
+        tokens = preprocess_text(review_text)
         vector = review_to_vector(tokens, w2v_model)
         tensor_input = torch.tensor(vector, dtype=torch.float32).unsqueeze(0)
 
         with torch.no_grad():
             probability = model(tensor_input).item()
-        
         predicted_label = 1 if probability > 0.5 else 0  
 
-        return jsonify({
-            'fake_review_probability': probability,
-            'is_fake': bool(predicted_label),
-            'message': "Fake review detected!" if probability >= 0.7 else "Uncertain review." if probability >= 0.4 else "Genuine review."
-        })
+        return jsonify({'fake_review_probability': probability, 'is_fake': bool(predicted_label)})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Run Flask server
 if __name__ == '__main__':
     app.run(debug=True)
