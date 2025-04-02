@@ -28,18 +28,21 @@ lemmatizer = WordNetLemmatizer()
 # Load dataset
 data = pd.read_csv('Home_and_Kitchen.csv')
 
-# Ensure binary labels
 data['validity'] = data['validity'].astype(int)
 
 # Preprocess text function
 def preprocess_text(text):
     tokens = word_tokenize(str(text).lower())  
     tokens = [lemmatizer.lemmatize(word) for word in tokens if word.isalpha() and word not in stop_words]  
+    
+    if len(tokens) < 3:  # Flag meaningless reviews
+        return ["meaningless_review"]
+    
     return tokens
 
 data['cleaned_reviews'] = data['text'].apply(preprocess_text)
 
-# Stratified train-test split to handle imbalance
+# Train-test split
 X_train_texts, X_test_texts, y_train, y_test = train_test_split(
     data['cleaned_reviews'], data['validity'], test_size=0.2, stratify=data['validity'], random_state=42
 )
@@ -52,7 +55,7 @@ else:
     w2v_model = Word2Vec(sentences=X_train_texts, vector_size=300, window=5, min_count=2, workers=4, sg=1, epochs=10)
     w2v_model.save(W2V_PATH)
 
-# Convert reviews into Word2Vec embeddings
+# Convert reviews to Word2Vec embeddings
 def review_to_vector(review, model, vector_size=300):
     vectors = [model.wv[word] for word in review if word in model.wv]
     return np.mean(vectors, axis=0) if vectors else np.zeros(vector_size)
@@ -97,12 +100,8 @@ if os.path.exists(MODEL_PATH):
     print("Model loaded successfully.")
 else:
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
-
-    # Compute class weights dynamically
     class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
-    
-    # Corrected BCELoss application
     criterion = nn.BCELoss()
 
     # Training loop
@@ -118,10 +117,9 @@ else:
             total_loss += loss.item()
         print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
 
-    # Save model
     torch.save(model.state_dict(), MODEL_PATH)
 
-# Evaluate the model
+# Evaluate model
 model.eval()
 correct, total = 0, 0
 with torch.no_grad():
@@ -147,25 +145,31 @@ def predict():
         if not review_text.strip():
             return jsonify({'error': 'Review text is empty'}), 400
 
-        # Preprocess & vectorize
         tokens = preprocess_text(review_text)
+        
+        if tokens == ["meaningless_review"]:
+            return jsonify({
+                'fake_review_probability': 1.0,
+                'is_fake': True,
+                'message': "This review is flagged as nonsense or too short to analyze."
+            })
+
         vector = review_to_vector(tokens, w2v_model)
         tensor_input = torch.tensor(vector, dtype=torch.float32).unsqueeze(0)
 
-        # Predict
         with torch.no_grad():
             probability = model(tensor_input).item()
+        
         predicted_label = 1 if probability > 0.5 else 0  
 
         return jsonify({
             'fake_review_probability': probability,
-            'is_fake': bool(predicted_label)
+            'is_fake': bool(predicted_label),
+            'message': "Fake review detected!" if probability >= 0.7 else "Uncertain review." if probability >= 0.4 else "Genuine review."
         })
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Run Flask server
 if __name__ == '__main__':
     app.run(debug=True)
-
