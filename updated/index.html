@@ -317,13 +317,19 @@ button {
         function redirectTo(page) {
             window.location.href = page;
         }
+        function redirectToContact() {
+            document.querySelector('.contact-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
     </script>
 </head>
 <body>
 
     <!-- Dashboard (Navigation Bar) -->
     <nav class="dashboard">
-        <div class="logo">VeriView</div>
+        <div class="logo">
+            <img src="logo.png" alt="VeriView">
+        </div>
         <button class="admin-login" onclick="redirectTo('admin_login')">Admin Login</button>
     </nav>
 
@@ -332,7 +338,8 @@ button {
         <p>Our advanced fake review detection system uses cutting-edge technology to accurately identify and flag suspicious reviews, helping you maintain the integrity of your online reputation.</p>
         <div class="buttons">
             <button class="get-started" onclick="redirectTo('detector')">Get Started</button>
-            <button class="learn-more">Learn More</button>
+            <button class="learn-more" onclick="redirectToContact()">Learn More</button>
+
         </div>
     </div>
 
@@ -363,32 +370,41 @@ button {
         </div>
     </div>
 
-    <!-- Contact Us Section -->
-    <section class="contact-section">
+       <!-- Contact Us Section -->
+       <section class="contact-section">
         <h2>Contact Us</h2>
         <p>Have a question or need support? Reach out to us!</p>
         <div class="contact-options">
             <div class="contact-box">
                 <span class="contact-icon">📧</span>
                 <h3>Email</h3>
-                <p>Feel free to contact us via email or phone during our business hours.</p>
+                <p>
+                    <a href="mailto:support@veriview.com">support@veriview.com</a>
+                </p>
             </div>
             <div class="contact-box">
                 <span class="contact-icon">📞</span>
                 <h3>Phone</h3>
-                <p>We strive to respond to all inquiries within 24 hours.</p>
+                <p>
+                    <a href="tel:+1234567890">+1 234 567 890</a>
+                </p>
             </div>
             <div class="contact-box">
                 <span class="contact-icon">📍</span>
                 <h3>Office</h3>
-                <p>Thank you for choosing VeriView.</p>
+                <p>
+                    <a href="https://www.google.com/maps?q=your+office+location" target="_blank">
+                        View on Google Maps
+                    </a>
+                </p>
             </div>
         </div>
     </section>
+
     <script>
         function redirectTo(page) {
             // Redirect to the page (use Flask route name, e.g., '/detector' in this case)
-            window.location.href = `/${page}`;
+            window.location.href = page;
         }
     </script>
     <!-- Footer -->
