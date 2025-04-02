@@ -21,7 +21,7 @@ stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
 # Load dataset
-data = pd.read_csv('fake reviews dataset.csv')
+data = pd.read_csv('Home_and_Kitchen.csv')
 
 # Ensure binary labels
 data['validity'] = data['validity'].astype(int)
@@ -50,7 +50,12 @@ else:
 # Convert reviews into Word2Vec embeddings
 def review_to_vector(review, model, vector_size=300):
     vectors = [model.wv[word] for word in review if word in model.wv]
-    return np.mean(vectors, axis=0) if vectors else np.zeros(vector_size)
+    
+    # If no known words, return a distinct OOV vector instead of zeros
+    if not vectors:
+        return np.full(vector_size, -1)  # Use a distinguishable value
+    
+    return np.mean(vectors, axis=0)
 
 X_train = np.array([review_to_vector(review, w2v_model) for review in X_train_texts])
 X_test = np.array([review_to_vector(review, w2v_model) for review in X_test_texts])
@@ -132,38 +137,37 @@ print(f'Accuracy on test set: {correct / total * 100:.2f}%')
 @app.route('/')
 def home():
     return render_template('index.html')
+
 @app.route('/detector')
 def detector():
     return render_template('detector.html')  
+
 @app.route('/admin_login')
 def admin_login():
     return render_template('admin_login.html')  
+
 @app.route('/admin')
 def admin():
     return render_template('admin.html')  
+
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
         review_text = data.get('review', '')
-
-        if not review_text.strip():
-            return jsonify({'error': 'Review text is empty'}), 400
-
-        # Preprocess & vectorize
+        
+        if not review_text.strip() or len(word_tokenize(review_text)) < 3:
+            return jsonify({'fake_review_probability': 1.0, 'is_fake': True})
+        
         tokens = preprocess_text(review_text)
         vector = review_to_vector(tokens, w2v_model)
         tensor_input = torch.tensor(vector, dtype=torch.float32).unsqueeze(0)
 
-        # Predict
         with torch.no_grad():
             probability = model(tensor_input).item()
         predicted_label = 1 if probability > 0.5 else 0  
 
-        return jsonify({
-            'fake_review_probability': probability,
-            'is_fake': bool(predicted_label)
-        })
+        return jsonify({'fake_review_probability': probability, 'is_fake': bool(predicted_label)})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
